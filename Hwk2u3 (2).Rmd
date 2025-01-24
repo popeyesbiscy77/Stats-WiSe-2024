@@ -1,0 +1,251 @@
+---
+title: "Homework 2&3"
+output: html_document
+date: "2025-01-22, made by Billy Mattler, Yehor ?? and Max Kadegis
+"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+This data is about student achievement in secondary education of two Portuguese schools for Mathematics. The data attributes include student grades, demographic, social and school related features) and it was collected by using school reports and questionnaires.
+```{r schoold stats}
+# Load the dataset from the file
+schoold <- read.table("student-mat.csv", sep = ";", header = TRUE, stringsAsFactors = FALSE)
+
+head(schoold)
+
+
+
+```
+Hypothesis 1:
+
+Here, we analyse the influence of internet access on final grades in math. We use G3 for this, because G3 is the final year grade, while G1 and G2 correspond to the 1st and 2nd period grades. 
+
+Our Null-Hypothesis is that the mean final grade is the same for both groups (with  and without internet access).
+Our Alt-Hypothesis states that there is a difference.
+
+
+Before doing testing, using a two-sample t-test, we need to confirm that we have an aproximate normal distribution, as well as enough variance in both groups.
+```{r Normal Distribution of Data }
+# t-test requirement 1: normal distribution
+# Perform Shapiro-Wilk test for normality
+
+# Subset the data for each group
+with_internet <- schoold$G3[schoold$internet == "yes"]
+without_internet <- schoold$G3[schoold$internet == "no"]
+shapiro_test_internet <- shapiro.test(with_internet)
+shapiro_test_no_internet <- shapiro.test(without_internet)
+
+# Print the results
+print("Shapiro-Wilk Test for 'With Internet' Group:")
+print(shapiro_test_internet)
+print("Shapiro-Wilk Test for 'Without Internet' Group:")
+print(shapiro_test_no_internet)
+
+
+
+# visual check1: Histogram with density curve and traditional bell curve
+# Add a grouping variable to distinguish between the two groups
+schoold$internet_group <- ifelse(schoold$internet == "yes", "With Internet", "Without Internet")
+
+# Plot histograms for both groups with normal distribution curves
+ggplot(schoold, aes(x = G3, fill = internet_group)) +
+  geom_histogram(aes(y = ..density..), bins = 10, position = "identity", alpha = 0.5) +
+  stat_function(data = subset(schoold, internet == "yes"), #for red line nd
+                fun = dnorm, 
+                args = list(mean = mean(schoold$G3[schoold$internet == "yes"]),
+                            sd = sd(schoold$G3[schoold$internet == "yes"])),
+                color = "red", size = 1) +
+  stat_function(data = subset(schoold, internet == "no"), # for dashed red line nd
+                fun = dnorm, 
+                args = list(mean = mean(schoold$G3[schoold$internet == "no"]),
+                            sd = sd(schoold$G3[schoold$internet == "no"])),
+                color = "red", linetype = "dashed", size = 1) +
+  theme_minimal() +
+  scale_fill_manual(values = c("With Internet" = "skyblue", "Without Internet" = "orange")) +
+  labs(title = "G3 Grades by Internet Access with Normal Distribution Curves",
+       x = "Final Grades (G3)", y = "Density",
+       fill = "Internet Access")
+
+# Visual check2: qq-plot
+ggplot(schoold, aes(sample = G3)) +
+  geom_qq(aes(color = internet_group)) +
+  geom_qq_line(aes(color = internet_group)) +
+  labs(title = "Q-Q Plot of G3 Grades by Internet Access",
+       x = "Theoretical Quantiles", y = "Sample Quantiles")
+
+```
+Even though the commonly used Shapiro-Wilk-test concluded our data sample to be not normally distributed, we were aware of its high sensitivity to outliers in large sample sizes and used a qqplot and an overlayed histogram to show that it is at least approximately normally distributed, which satisfies the requirement needed to be able to run a proper t-test.
+
+Next, we tested for sufficient variance in both groups.
+```{r variance in data}
+# Define the two groups
+with_internet <- schoold$G3[schoold$internet == "yes"]
+without_internet <- schoold$G3[schoold$internet == "no"]
+
+# Perform F-test to check for equal variances
+var_test_result <- var.test(with_internet, without_internet)
+
+# Print the result of the F-test
+print(var_test_result)
+
+# Load the necessary libraries
+library(ggplot2)
+
+# Add a grouping variable for visualization (if not already done)
+schoold$internet_group <- ifelse(schoold$internet == "yes", "With Internet", "Without Internet")
+
+# Create a boxplot to visually assess the variance and spread of the data for each group
+ggplot(schoold, aes(x = internet_group, y = G3, fill = internet_group)) +
+  geom_boxplot(alpha = 0.5, outlier.color = "red", outlier.shape = 16) + # Boxplot
+  geom_jitter(width = 0.2, alpha = 0.6, color = "black") +               # Add individual data points
+  labs(title = "Variance in G3 Scores by Internet Access",
+       x = "Internet Access",
+       y = "Final Grades (G3)",
+       fill = "Group") +
+  theme_minimal() +
+  scale_fill_manual(values = c("With Internet" = "skyblue", "Without Internet" = "orange")) +
+  theme(legend.position = "none") # Remove the legend if you prefer it cleaner
+
+
+
+```
+
+Given that the p-value is high (0.8624) and the confidence interval includes 1, we can conclude that the variances in the two groups (with internet vs. without internet) are not significantly different, assuming that the variances are approximately equal between the two groups.
+
+This means that we can proceed with a t-test.
+``` {r T-test 1}
+# Perform t-test (Welch's t-test by default)
+t_test_result <- t.test(with_internet, without_internet)
+
+# Print the t-test result
+print(t_test_result)
+
+# t-Test dispersion
+
+schoold$internet_group <- ifelse(schoold$internet == "yes", "With Internet", "Without Internet")
+
+# Boxplot with means overlaid
+ggplot(schoold, aes(x = internet_group, y = G3, fill = internet_group)) +
+  geom_boxplot(alpha = 0.5, outlier.color = "red", outlier.shape = 16) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+  labs(title = "Comparison of Final Grade Scores(Math) by Internet Access",
+       x = "Internet Access",
+       y = "Final Grades (G3)",
+       fill = "Group") +
+  theme_minimal() +
+  scale_fill_manual(values = c("With Internet" = "skyblue", "Without Internet" = "orange"))
+
+
+```
+
+Our two-sample t-test provides barely enough evidence (especially p-value = 0.04955) to reject the null-hypothesis and to say that the alternative hypothesis *may* be true. This implies that students in Portugal do, in fact, have higher final grade scores in math when internet access is available, compared to those without.
+
+#################(sample was not nd in the first place?)
+
+Next, we do a power analysis of this result.
+```{r power analysis of internet on final grades} 
+# Sample data: means and standard deviations for the two groups
+mean_with_internet <- 10.617021
+mean_without_internet <- 9.409091
+
+# Standard deviations for the two groups (replace with your actual values)
+sd_with_internet <- 2.5  # Example value for "With Internet"
+sd_without_internet <- 2.8  # Example value for "Without Internet"
+
+# Calculate Cohen's d (Effect size)
+pooled_sd <- sqrt(((sd_with_internet^2) + (sd_without_internet^2)) / 2)
+cohen_d <- abs(mean_with_internet - mean_without_internet) / pooled_sd
+
+# Print Cohen's d (Effect size)
+print(paste("Cohen's d (Effect size):", cohen_d))
+
+# Set up ranges for the parameters
+sample_size_range <- seq(10, 200, by = 10)  # Vary sample size
+sd_range <- seq(1.5, 4, by = 0.5)  # Vary standard deviation
+effect_size_range <- seq(0.1, 1.5, by = 0.1)  # Vary effect size
+
+# Initialize an empty data frame to store power results
+power_results <- data.frame()
+
+# Perform the power analysis by varying sample size, effect size, and standard deviation
+for (sample_size in sample_size_range) {
+  for (sd_value in sd_range) {
+    for (effect_size_value in effect_size_range) {
+      
+      # Compute power using power.t.test
+      power_test <- power.t.test(n = sample_size, delta = effect_size_value, sd = sd_value, type = "two.sample", alternative = "two.sided")
+      
+      # Store the results in the data frame
+      power_results <- rbind(power_results, data.frame(
+        SampleSize = sample_size,
+        SD = sd_value,
+        EffectSize = effect_size_value,
+        Power = power_test$power
+      ))
+    }
+  }
+}
+
+# Visualize the results: Power vs. Sample Size for different Effect Sizes and SDs
+ggplot(power_results, aes(x = SampleSize, y = Power, color = factor(EffectSize), linetype = factor(SD))) +
+  geom_line() +
+  labs(title = "Power Analysis for Welch's T-test", 
+       x = "Sample Size", 
+       y = "Power", 
+       color = "Effect Size", 
+       linetype = "Standard Deviation") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+What this tells us:
+Effect Size: The effect size of 0.455 suggests a moderate difference between the two groups. This is meaningful, but not a large difference.
+
+Power: A power of 0.42 suggests that with the current sample size of 100 and an effect size of 0.5, there is only a 42% chance of detecting a real difference. This is low, and it suggests that your current sample size might be too small for reliable conclusions.
+
+We may need to increase the sample size to improve the power of the test.
+
+
+
+
+
+# Hypothesis 2:
+
+Here, we want to establish whether internet access influences time spent studying.
+
+Our Null-Hypothesis is that the time students spend studying is the same for those with  and without internet access.
+
+We expect a rejection of the null and less time spent studying among those with internet access, despite the fact that their final grades are moderately better than the grades of those without internet access. 
+
+*imma skip the whole normal/not normal thing cuz krish said you can just assume that its normal* 
+
+``` {r T-test 2}
+# Subset data
+scrollers <- schoold$studytime[schoold$internet == "yes"]
+pageturners <- schoold$studytime[schoold$internet == "no"]
+
+# Perform t-test (Welch's t-test by default)
+t_test_result2 <- t.test(scrollers, pageturners)
+
+# Print the t-test result
+print(t_test_result2)
+
+# Boxplot with means overlaid
+ggplot(schoold, aes(x = internet_group, y = studytime, fill = internet_group)) +
+  geom_boxplot(alpha = 0.5, outlier.color = "red", outlier.shape = 16) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+  labs(title = "Time students spend studying, grouped by Internet Access",
+       x = "Internet Access",
+       y = "TSS",
+       fill = "Group") +
+  theme_minimal() +
+  scale_fill_manual(values = c("With Internet" = "skyblue", "Without Internet" = "orange"))
+print(scrollers)
+
+```
+Our t-test decidedly confirms the null hypothesis as it yields an extremely low p-value. This is a surprising result, because everyone with internet access can attest to its unmatched capacity as a source of distractions and diversions. This is genuinely interesting outside the simulated context of this homework assignment, because it seems to suggest that Portuguese students somehow manage their relationship with a phenomenon that has been proven to feature addictive content prominently far more successfully than e.g. their American counterparts (appear to) do. Obviously, this specific conclusion is based on a litany of biased and unsupported assumptions, nevertheless, it seems likely that this result might be worth investigating in a real-world scientific context. 
+
+
